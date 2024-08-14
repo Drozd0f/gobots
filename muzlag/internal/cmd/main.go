@@ -1,0 +1,22 @@
+package main
+
+import (
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/Drozd0f/gobots/muzlag/internal/cmd/bot"
+)
+
+func main() {
+	session := bot.NewBot()
+
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	<-sc
+
+	if err := session.Close(); err != nil {
+		log.Fatalf("sesson close: %s", err)
+	}
+}
