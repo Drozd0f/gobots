@@ -38,8 +38,7 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		return fmt.Errorf("get channel: %w", err)
 	}
 
-	var vc *discordgo.VoiceConnection
-	vc, err = s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, true)
+	vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, true)
 	if err != nil {
 		return fmt.Errorf("channel voice join: %w", err)
 	}

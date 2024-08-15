@@ -127,13 +127,7 @@ func (s *ServicePlayer) sendPCM(v *discordgo.VoiceConnection, pcm <-chan []int16
 		return
 	}
 
-	for {
-		// read pcm from chan, exit if channel is closed.
-		recv, ok := <-pcm
-		if !ok {
-			return
-		}
-
+	for recv := range pcm {
 		// try encoding pcm frame with Opus
 		opus, err := opusEncoder.Encode(recv, frameSize, maxBytes)
 		if err != nil {

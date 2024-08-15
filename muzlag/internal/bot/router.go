@@ -10,16 +10,17 @@ import (
 	"github.com/Drozd0f/gobots/muzlag/pkg/log"
 )
 
-type NewRouterParams struct {
+type newRouterParams struct {
 	Prefix string
 	Player handlers.Player
 	Logger *slog.Logger
 }
 
-func NewRouter(session *discordgo.Session, p NewRouterParams) {
+func registerRoutes(session *discordgo.Session, p newRouterParams) {
 	registerMessageCreateHandlers(session, registerMessageCreateHandlersParams{
 		prefix: p.Prefix,
 		player: p.Player,
+		logger: p.Logger,
 	})
 }
 

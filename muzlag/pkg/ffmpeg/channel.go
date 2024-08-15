@@ -5,8 +5,8 @@ import "strconv"
 type Channel int
 
 const (
-	MonoChannel   Channel = 1
-	StereoChannel Channel = 2
+	MonoChannel Channel = iota + 1
+	StereoChannel
 )
 
 func (c Channel) Int() int {

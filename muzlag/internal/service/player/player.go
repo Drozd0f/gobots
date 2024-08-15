@@ -7,13 +7,6 @@ import (
 	"github.com/Drozd0f/gobots/muzlag/pkg/ytdl"
 )
 
-type NewServicePlayerParams struct {
-	Logger *slog.Logger
-
-	DL     ytdl.DL
-	Ffmpeg ffmpeg.Ffmpeg
-}
-
 type ServicePlayer struct {
 	logger *slog.Logger
 
@@ -21,10 +14,10 @@ type ServicePlayer struct {
 	ffmpeg ffmpeg.Ffmpeg
 }
 
-func NewServicePlayer(p NewServicePlayerParams) *ServicePlayer {
+func NewServicePlayer(logger *slog.Logger, dl ytdl.DL, f ffmpeg.Ffmpeg) *ServicePlayer {
 	return &ServicePlayer{
-		logger: p.Logger,
-		dl:     p.DL,
-		ffmpeg: p.Ffmpeg,
+		logger: logger,
+		dl:     dl,
+		ffmpeg: f,
 	}
 }

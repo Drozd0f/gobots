@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/Drozd0f/gobots/muzlag/pkg/config"
+	"github.com/kelseyhightower/envconfig"
+
 	"github.com/Drozd0f/gobots/muzlag/pkg/ffmpeg"
 	"github.com/Drozd0f/gobots/muzlag/pkg/ytdl"
 )
@@ -19,10 +20,10 @@ type Config struct {
 	Ffmpeg   ffmpeg.Config `required:"true"`
 }
 
-func NewConfig() (*Config, error) {
-	var cfg = new(Config)
-	if err := config.Process(AppName, cfg); err != nil {
-		return nil, fmt.Errorf("process config: %w", err)
+func NewConfig() (Config, error) {
+	var cfg Config
+	if err := envconfig.Process(AppName, &cfg); err != nil {
+		return Config{}, fmt.Errorf("process config: %w", err)
 	}
 
 	return cfg, nil
