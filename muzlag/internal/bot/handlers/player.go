@@ -26,16 +26,20 @@ func NewPlayer(logger *slog.Logger, s *player.ServicePlayer) Player {
 func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	sliceContent := strings.Split(m.Content, " ")
 	if len(sliceContent) != 2 {
-		if _, err := s.ChannelMessageSendReply(m.ChannelID, "too many words, expected: 2", m.Reference()); err != nil {
-			return fmt.Errorf("channel message send reply: %w", err)
-		}
-
-		return nil
+		return reply(s, m, "too many arguments, expected: 1")
 	}
 
 	vs, err := s.State.VoiceState(m.GuildID, m.Author.ID)
 	if err != nil {
 		return fmt.Errorf("get channel: %w", err)
+	}
+
+	if vc := s.VoiceConnections[m.GuildID]; vc != nil {
+		if vc.ChannelID != vs.ChannelID {
+			return reply(s, m, "I'm in another voice channel!")
+		}
+
+		return nil
 	}
 
 	vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, true)
@@ -58,4 +62,23 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	}
 
 	return nil
+}
+
+func (p Player) Stop(s *discordgo.Session, m *discordgo.MessageCreate) error {
+	vs, err := s.State.VoiceState(m.GuildID, m.Author.ID)
+	if err != nil {
+		return fmt.Errorf("get channel: %w", err)
+	}
+
+	if s.VoiceConnections[m.GuildID] == nil {
+		return reply(s, m, "I'm not in voice channel")
+	}
+
+	vc := s.VoiceConnections[m.GuildID]
+	if vs.ChannelID != vc.ChannelID {
+		return reply(s, m, "You can't stop me I'm in another voice channel!")
+	}
+
+	// TODO: Stop player in this voice
+	return vc.Disconnect()
 }

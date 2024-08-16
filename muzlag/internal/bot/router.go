@@ -42,6 +42,8 @@ func registerMessageCreateHandlers(session *discordgo.Session, p registerMessage
 			err = handlers.Ping(s, m)
 		case strings.HasPrefix(m.Content, p.prefix+"play"):
 			err = p.player.Play(s, m)
+		case strings.HasPrefix(m.Content, p.prefix+"stop"):
+			err = p.player.Play(s, m)
 		}
 
 		if err != nil {
