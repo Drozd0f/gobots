@@ -5,7 +5,8 @@ import (
 )
 
 type DL interface {
-	GetAudioStream(url string, f Format) (Stream, error)
+	GetAudioStream(url string, opts ...Option) (Stream, error)
+	GetVideoAttributes(url string, opts ...Option) (VideoAttributes, error)
 }
 
 type Stream interface {
