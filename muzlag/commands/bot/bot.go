@@ -7,7 +7,7 @@ import (
 	"github.com/Drozd0f/gobots/muzlag/internal/bot"
 	"github.com/Drozd0f/gobots/muzlag/internal/bot/handlers"
 	"github.com/Drozd0f/gobots/muzlag/internal/config"
-	"github.com/Drozd0f/gobots/muzlag/internal/service/player"
+	"github.com/Drozd0f/gobots/muzlag/internal/service"
 	"github.com/Drozd0f/gobots/muzlag/pkg/ffmpeg"
 	pkgLog "github.com/Drozd0f/gobots/muzlag/pkg/log"
 	"github.com/Drozd0f/gobots/muzlag/pkg/ytdl"
@@ -23,9 +23,9 @@ func RunBot(ctx context.Context) error {
 
 	ph := handlers.NewPlayer(
 		logger,
-		player.NewServicePlayer(
+		service.NewService(
 			logger,
-			ytdl.NewDL(cfg.DL, ytdl.WithStandardOutput(), ytdl.WithVerbose()),
+			ytdl.NewDL(cfg.DL),
 			ffmpeg.NewFfmpeg(cfg.Ffmpeg),
 		))
 
