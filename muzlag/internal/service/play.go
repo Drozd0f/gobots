@@ -44,6 +44,10 @@ func (s *Service) Play(vc *discordgo.VoiceConnection) error {
 		if err = s.play(vc, gq); err != nil {
 			return err
 		}
+
+		if len(gq.Attrs) == 0 {
+			return nil
+		}
 	}
 }
 
