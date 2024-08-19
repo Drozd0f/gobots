@@ -89,6 +89,10 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		return fmt.Errorf("service play: %w", err)
 	}
 
+	if err = vc.Disconnect(); err != nil {
+		return fmt.Errorf("voice connection disconnect: %w", err)
+	}
+
 	return nil
 }
 
@@ -110,9 +114,8 @@ func (p Player) Stop(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	if err = p.s.DropGuildQueue(vc.GuildID); err != nil {
 		return fmt.Errorf("drop guild queue: %w", err)
 	}
-	vc.Close()
 
-	return vc.Disconnect()
+	return nil
 }
 
 func (p Player) Skip(s *discordgo.Session, m *discordgo.MessageCreate) error {
