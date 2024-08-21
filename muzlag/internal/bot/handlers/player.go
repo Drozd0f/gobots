@@ -13,6 +13,7 @@ import (
 	"github.com/Drozd0f/gobots/muzlag/internal/service"
 	"github.com/Drozd0f/gobots/muzlag/pkg/discordgom"
 	"github.com/Drozd0f/gobots/muzlag/pkg/log"
+	"github.com/Drozd0f/gobots/muzlag/pkg/markdown"
 	"github.com/Drozd0f/gobots/muzlag/pkg/stringm"
 )
 
@@ -43,7 +44,11 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 
 	if vc := s.VoiceConnections[m.GuildID]; vc != nil {
 		if vc.ChannelID != vs.ChannelID {
-			return reply(s, m, "I'm in another voice channel!")
+			return reply(s, m,
+				fmt.Sprintf("%s from where you sad that? %s",
+					markdown.Bold(m.Author.Username),
+				),
+			)
 		}
 
 		title, err := p.s.PushGuildQueue(vc.GuildID, sliceContent[1])
