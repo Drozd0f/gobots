@@ -53,8 +53,8 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 			return fmt.Errorf("push guild queue: %w", err)
 		}
 
-		return discordgom.Reply(s, m, fmt.Sprintf("%s %s song with title: %s, add in queue",
-			emoji.LoadingEmoji,
+		return discordgom.MessageSend(s, m, fmt.Sprintf("%s %s song with title: %s, add in queue",
+			emoji.RemDanceCenterEmoji,
 			markdown.Bold(m.Author.Username),
 			title,
 		))
@@ -83,8 +83,8 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		return fmt.Errorf("push guild queue: %w", err)
 	}
 
-	if err = discordgom.Reply(s, m, fmt.Sprintf("%s %s song with title: %s, add in queue",
-		emoji.LoadingEmoji,
+	if err = discordgom.MessageSend(s, m, fmt.Sprintf("%s %s song with title: %s, add in queue",
+		emoji.RemDanceCenterEmoji,
 		markdown.Bold(m.Author.Username),
 		title,
 	)); err != nil {
@@ -115,18 +115,6 @@ func (p Player) play(s *discordgo.Session, m *discordgo.MessageCreate, vc *disco
 
 	send := make(chan []int16, 2)
 	defer close(send)
-
-	done := make(chan bool)
-	go func() {
-		discordgom.SendPCM(vc, discordgom.SendPCMParams{
-			Logger:    p.logger,
-			FrameRate: p.cfg.Ffmpeg.FrameRate,
-			Channels:  p.cfg.Ffmpeg.Channels.Int(),
-			FrameSize: p.cfg.PCM.FrameSize,
-			PCM:       send,
-		})
-		done <- true
-	}()
 
 	for {
 		gq, err := p.s.GetGuildQueue(vc.GuildID)
@@ -160,6 +148,18 @@ func (p Player) play(s *discordgo.Session, m *discordgo.MessageCreate, vc *disco
 			return fmt.Errorf("message send: %w", err)
 		}
 
+		done := make(chan bool)
+		go func() {
+			discordgom.SendPCM(vc, discordgom.SendPCMParams{
+				Logger:    p.logger,
+				FrameRate: p.cfg.Ffmpeg.FrameRate,
+				Channels:  p.cfg.Ffmpeg.Channels.Int(),
+				FrameSize: p.cfg.PCM.FrameSize,
+				PCM:       send,
+			})
+			done <- true
+		}()
+
 		if err = p.s.Play(service.PlayParams{
 			GuildQueue:      gq,
 			VideoAttributes: va,
@@ -173,6 +173,8 @@ func (p Player) play(s *discordgo.Session, m *discordgo.MessageCreate, vc *disco
 		if len(gq.Attrs) == 0 {
 			return nil
 		}
+
+		send = make(chan []int16, 2)
 	}
 }
 

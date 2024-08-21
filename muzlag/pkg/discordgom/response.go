@@ -14,16 +14,9 @@ import (
 )
 
 func MessageSend(s *discordgo.Session, mc *discordgo.MessageCreate, content string) error {
-	m, err := s.ChannelMessageSend(mc.ChannelID, content)
-	if err != nil {
+	if _, err := s.ChannelMessageSend(mc.ChannelID, content); err != nil {
 		return fmt.Errorf("channel message send reply: %w", err)
 	}
-
-	go func() {
-		if err = deleteBotMessage(s, m, 5*time.Second); err != nil {
-			slog.Warn("failed to delete bot message: %s", log.SlogError(err))
-		}
-	}()
 
 	return nil
 }
@@ -56,7 +49,7 @@ func ReplyQueue(s *discordgo.Session, mc *discordgo.MessageCreate, gq *queue.Gui
 		}
 
 		go func() {
-			if err = deleteBotMessage(s, m, 5*time.Second); err != nil {
+			if err = deleteBotMessage(s, m, 10*time.Second); err != nil {
 				slog.Warn("failed to delete bot message: %s", log.SlogError(err))
 			}
 		}()
