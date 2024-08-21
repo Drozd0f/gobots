@@ -8,18 +8,23 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 
+	"github.com/Drozd0f/gobots/muzlag/internal/config"
+	"github.com/Drozd0f/gobots/muzlag/internal/queue"
 	"github.com/Drozd0f/gobots/muzlag/internal/service"
+	"github.com/Drozd0f/gobots/muzlag/pkg/discordgom"
 	"github.com/Drozd0f/gobots/muzlag/pkg/log"
 	"github.com/Drozd0f/gobots/muzlag/pkg/stringm"
 )
 
 type Player struct {
+	cfg    config.Config
 	logger *slog.Logger
 	s      *service.Service
 }
 
-func NewPlayer(logger *slog.Logger, s *service.Service) Player {
+func NewPlayer(cfg config.Config, logger *slog.Logger, s *service.Service) Player {
 	return Player{
+		cfg:    cfg,
 		logger: logger,
 		s:      s,
 	}
@@ -73,20 +78,16 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		return err
 	}
 
-	// Send "speaking" packet over the voice websocket
 	if err = vc.Speaking(true); err != nil {
-		return fmt.Errorf("voice connection speaking: %w", err)
+		return fmt.Errorf("voice connection start speaking: %w", err)
 	}
 
-	// Send not "speaking" packet over the websocket when finish
-	defer func() {
-		if err = vc.Speaking(false); err != nil {
-			p.logger.Error("voice connection speaking false", slog.Any("error", err))
-		}
-	}()
-
-	if err = p.s.Play(vc); err != nil {
+	if err = p.play(s, m, vc); err != nil {
 		return fmt.Errorf("service play: %w", err)
+	}
+
+	if err = vc.Speaking(false); err != nil {
+		return fmt.Errorf("voice connection stop speaking: %w", err)
 	}
 
 	if err = vc.Disconnect(); err != nil {
@@ -94,6 +95,71 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	}
 
 	return nil
+}
+
+func (p Player) play(s *discordgo.Session, m *discordgo.MessageCreate, vc *discordgo.VoiceConnection) error {
+	defer func() {
+		if err := p.s.DropGuildQueue(vc.GuildID); err != nil && !errors.Is(err, queue.ErrNotFound) {
+			slog.Error("drop guild queue", log.SlogError(err))
+		}
+	}()
+
+	send := make(chan []int16, 2)
+	defer close(send)
+
+	done := make(chan bool)
+	go func() {
+		discordgom.SendPCM(vc, discordgom.SendPCMParams{
+			Logger:    p.logger,
+			FrameRate: p.cfg.Ffmpeg.FrameRate,
+			Channels:  p.cfg.Ffmpeg.Channels.Int(),
+			FrameSize: p.cfg.PCM.FrameSize,
+			PCM:       send,
+		})
+		done <- true
+	}()
+
+	for {
+		gq, err := p.s.GetGuildQueue(vc.GuildID)
+		if err != nil {
+			if errors.Is(err, service.ErrGuildQueueNotFound) {
+				return nil
+			}
+
+			return fmt.Errorf("get guild queue: %w", err)
+		}
+
+		if !gq.Ready {
+			return nil
+		}
+
+		va, err := gq.Dequeue()
+		if err != nil {
+			if errors.Is(err, queue.ErrEmptyQueue) {
+				return nil
+			}
+
+			return fmt.Errorf("guild queue dequeue: %w", err)
+		}
+
+		if err = messageSend(s, m, fmt.Sprintf("Now playing %s", va.Title)); err != nil {
+			return fmt.Errorf("message send: %w", err)
+		}
+
+		if err = p.s.Play(service.PlayParams{
+			GuildQueue:      gq,
+			VideoAttributes: va,
+			FrameSize:       p.cfg.PCM.FrameSize,
+			Done:            done,
+			Send:            send,
+		}); err != nil {
+			return fmt.Errorf("service play: %w", err)
+		}
+
+		if len(gq.Attrs) == 0 {
+			return nil
+		}
+	}
 }
 
 func (p Player) Stop(s *discordgo.Session, m *discordgo.MessageCreate) error {
