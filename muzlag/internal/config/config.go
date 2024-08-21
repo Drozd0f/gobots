@@ -18,6 +18,11 @@ type Config struct {
 	LogLevel slog.Level    `required:"true" split_words:"true"`
 	DL       ytdl.Config   `required:"true"`
 	Ffmpeg   ffmpeg.Config `required:"true"`
+	PCM      PCMConfig     `required:"true" split_words:"true"`
+}
+
+type PCMConfig struct {
+	FrameSize int `required:"true" split_words:"true"`
 }
 
 func NewConfig() (Config, error) {

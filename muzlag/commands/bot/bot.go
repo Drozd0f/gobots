@@ -22,7 +22,7 @@ func RunBot(ctx context.Context) error {
 	logger := pkgLog.NewLogger(cfg.LogLevel)
 
 	ph := handlers.NewPlayer(
-		logger,
+		cfg, logger,
 		service.NewService(
 			logger,
 			ytdl.NewDL(cfg.DL),
