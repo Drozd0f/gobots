@@ -7,6 +7,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 
 	"github.com/Drozd0f/gobots/muzlag/internal/bot/handlers"
+	"github.com/Drozd0f/gobots/muzlag/internal/bot/middleware"
 	"github.com/Drozd0f/gobots/muzlag/pkg/log"
 )
 
@@ -41,13 +42,13 @@ func registerMessageCreateHandlers(session *discordgo.Session, p registerMessage
 		case strings.HasPrefix(m.Content, p.prefix+"ping"):
 			err = handlers.Ping(s, m)
 		case strings.HasPrefix(m.Content, p.prefix+"play"):
-			err = p.player.Play(s, m)
+			err = middleware.MessageCreateVoiceRequired(s, m, p.player.Play)
 		case strings.HasPrefix(m.Content, p.prefix+"stop"):
-			err = p.player.Stop(s, m)
+			err = middleware.MessageCreateVoiceRequired(s, m, p.player.Stop)
 		case strings.HasPrefix(m.Content, p.prefix+"skip"):
-			err = p.player.Skip(s, m)
+			err = middleware.MessageCreateVoiceRequired(s, m, p.player.Skip)
 		case strings.HasPrefix(m.Content, p.prefix+"queue"):
-			err = p.player.Queue(s, m)
+			err = middleware.MessageCreateVoiceRequired(s, m, p.player.Queue)
 		}
 
 		if err != nil {

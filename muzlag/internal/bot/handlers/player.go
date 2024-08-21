@@ -12,6 +12,7 @@ import (
 	"github.com/Drozd0f/gobots/muzlag/internal/queue"
 	"github.com/Drozd0f/gobots/muzlag/internal/service"
 	"github.com/Drozd0f/gobots/muzlag/pkg/discordgom"
+	"github.com/Drozd0f/gobots/muzlag/pkg/emoji"
 	"github.com/Drozd0f/gobots/muzlag/pkg/log"
 	"github.com/Drozd0f/gobots/muzlag/pkg/markdown"
 	"github.com/Drozd0f/gobots/muzlag/pkg/stringm"
@@ -34,7 +35,10 @@ func NewPlayer(cfg config.Config, logger *slog.Logger, s *service.Service) Playe
 func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 	sliceContent := strings.Split(m.Content, " ")
 	if len(sliceContent) != 2 {
-		return reply(s, m, "too many arguments, expected: 1")
+		return discordgom.Reply(s, m, fmt.Sprintf("%s too many arguments, expected: 1 %s",
+			markdown.Bold(m.Author.Username),
+			emoji.AnimeeyesCenterEmoji,
+		))
 	}
 
 	vs, err := s.State.VoiceState(m.GuildID, m.Author.ID)
@@ -42,29 +46,27 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		return fmt.Errorf("get channel: %w", err)
 	}
 
-	if vc := s.VoiceConnections[m.GuildID]; vc != nil {
-		if vc.ChannelID != vs.ChannelID {
-			return reply(s, m,
-				fmt.Sprintf("%s from where you sad that? %s",
-					markdown.Bold(m.Author.Username),
-				),
-			)
-		}
-
+	vc := s.VoiceConnections[m.GuildID]
+	if vc != nil {
 		title, err := p.s.PushGuildQueue(vc.GuildID, sliceContent[1])
 		if err != nil {
 			return fmt.Errorf("push guild queue: %w", err)
 		}
 
-		return reply(s, m, fmt.Sprintf("Song with title: %s, add in queue", title))
+		return discordgom.Reply(s, m, fmt.Sprintf("%s %s song with title: %s, add in queue",
+			emoji.LoadingEmoji,
+			markdown.Bold(m.Author.Username),
+			title,
+		))
 	}
 
-	vc, err := s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, true)
+	vc, err = s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, true)
 	if err != nil {
 		return fmt.Errorf("channel voice join: %w", err)
 	}
 
 	defer func() {
+		vc.Close()
 		if err = vc.Disconnect(); err != nil {
 			p.logger.Error("voice connection disconnect",
 				log.SlogError(err),
@@ -72,19 +74,21 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		}
 	}()
 
-	defer vc.Close()
+	if err = vc.Speaking(true); err != nil {
+		return fmt.Errorf("voice connection start speaking: %w", err)
+	}
 
 	title, err := p.s.PushGuildQueue(vc.GuildID, sliceContent[1])
 	if err != nil {
 		return fmt.Errorf("push guild queue: %w", err)
 	}
 
-	if err = reply(s, m, fmt.Sprintf("Song with title: %s, add in queue", title)); err != nil {
-		return err
-	}
-
-	if err = vc.Speaking(true); err != nil {
-		return fmt.Errorf("voice connection start speaking: %w", err)
+	if err = discordgom.Reply(s, m, fmt.Sprintf("%s %s song with title: %s, add in queue",
+		emoji.LoadingEmoji,
+		markdown.Bold(m.Author.Username),
+		title,
+	)); err != nil {
+		return fmt.Errorf("push guild queue: %w", err)
 	}
 
 	if err = p.play(s, m, vc); err != nil {
@@ -147,7 +151,12 @@ func (p Player) play(s *discordgo.Session, m *discordgo.MessageCreate, vc *disco
 			return fmt.Errorf("guild queue dequeue: %w", err)
 		}
 
-		if err = messageSend(s, m, fmt.Sprintf("Now playing %s", va.Title)); err != nil {
+		if err = discordgom.MessageSend(s, m,
+			fmt.Sprintf("%s Now playing %s : %s",
+				emoji.MusicalNoteDefaultEmoji,
+				emoji.MusicalNoteDefaultEmoji,
+				markdown.Bold(va.Title),
+			)); err != nil {
 			return fmt.Errorf("message send: %w", err)
 		}
 
@@ -168,21 +177,12 @@ func (p Player) play(s *discordgo.Session, m *discordgo.MessageCreate, vc *disco
 }
 
 func (p Player) Stop(s *discordgo.Session, m *discordgo.MessageCreate) error {
-	vs, err := s.State.VoiceState(m.GuildID, m.Author.ID)
-	if err != nil {
-		return fmt.Errorf("get channel: %w", err)
-	}
-
-	if s.VoiceConnections[m.GuildID] == nil {
-		return reply(s, m, "I'm not in voice channel")
-	}
-
 	vc := s.VoiceConnections[m.GuildID]
-	if vs.ChannelID != vc.ChannelID {
-		return reply(s, m, "You can't stop me I'm in another voice channel!")
+	if vc == nil {
+		return nil
 	}
 
-	if err = p.s.DropGuildQueue(vc.GuildID); err != nil {
+	if err := p.s.DropGuildQueue(vc.GuildID); err != nil {
 		return fmt.Errorf("drop guild queue: %w", err)
 	}
 
@@ -190,31 +190,27 @@ func (p Player) Stop(s *discordgo.Session, m *discordgo.MessageCreate) error {
 }
 
 func (p Player) Skip(s *discordgo.Session, m *discordgo.MessageCreate) error {
-	vs, err := s.State.VoiceState(m.GuildID, m.Author.ID)
-	if err != nil {
-		return fmt.Errorf("get channel: %w", err)
-	}
-
-	if s.VoiceConnections[m.GuildID] == nil {
-		return reply(s, m, "I'm not in voice channel")
-	}
-
 	vc := s.VoiceConnections[m.GuildID]
-	if vs.ChannelID != vc.ChannelID {
-		return reply(s, m, "You can't stop me I'm in another voice channel!")
+	if vc == nil {
+		return nil
 	}
 
 	sliceContent := strings.Split(m.Content, " ")
 	if len(sliceContent) > 2 {
-		return reply(s, m, "too many arguments, expected: 1")
+		return discordgom.Reply(s, m, fmt.Sprintf("%s too many arguments, expected: 1 %s",
+			markdown.Bold(m.Author.Username),
+			emoji.AnimeeyesCenterEmoji,
+		))
 	}
 
-	var count int64 = 1
+	var sCount = "1"
 	if len(sliceContent) == 2 {
-		count, err = stringm.ToInt64(sliceContent[1])
-		if err != nil {
-			return fmt.Errorf("stringm to int64: %w", err)
-		}
+		sCount = sliceContent[1]
+	}
+
+	count, err := stringm.ToInt64(sCount)
+	if err != nil {
+		return fmt.Errorf("stringm to int64: %w", err)
 	}
 
 	if err = p.s.SkipGuildQueue(vc.GuildID, count); err != nil {
@@ -225,33 +221,22 @@ func (p Player) Skip(s *discordgo.Session, m *discordgo.MessageCreate) error {
 }
 
 func (p Player) Queue(s *discordgo.Session, m *discordgo.MessageCreate) error {
-	vs, err := s.State.VoiceState(m.GuildID, m.Author.ID)
-	if err != nil {
-		return fmt.Errorf("get channel: %w", err)
-	}
-
-	if s.VoiceConnections[m.GuildID] == nil {
-		return reply(s, m, "I'm not in voice channel")
-	}
-
 	vc := s.VoiceConnections[m.GuildID]
-	if vs.ChannelID != vc.ChannelID {
-		return reply(s, m, "You can't stop me I'm in another voice channel!")
-	}
-
-	sliceContent := strings.Split(m.Content, " ")
-	if len(sliceContent) > 2 {
-		return reply(s, m, "too many arguments, expected: 1")
+	if vc == nil {
+		return nil
 	}
 
 	gq, err := p.s.GetGuildQueue(vc.GuildID)
 	if err != nil {
 		if errors.Is(err, service.ErrGuildQueueNotFound) {
-			return reply(s, m, "I'm not playing now")
+			return discordgom.Reply(s, m, fmt.Sprintf("%s i`m not even in voice channel! %s",
+				markdown.Bold(m.Author.Username),
+				emoji.KissingHeartDefaultEmoji,
+			))
 		}
 
 		return fmt.Errorf("get attributes: %w", err)
 	}
 
-	return replyQueue(s, m, gq)
+	return discordgom.ReplyQueue(s, m, gq)
 }
