@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -33,6 +34,9 @@ func NewPlayer(cfg config.Config, logger *slog.Logger, s *service.Service) Playe
 }
 
 func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	sliceContent := strings.Split(m.Content, " ")
 	if len(sliceContent) != 2 {
 		return discordgom.Reply(s, m, fmt.Sprintf("%s too many arguments, expected: 1 %s",
@@ -60,14 +64,13 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		))
 	}
 
-	vc, err = s.ChannelVoiceJoin(vs.GuildID, vs.ChannelID, false, true)
+	vc, err = s.ChannelVoiceJoin(ctx, vs.GuildID, vs.ChannelID, false, true)
 	if err != nil {
 		return fmt.Errorf("channel voice join: %w", err)
 	}
 
 	defer func() {
-		vc.Close()
-		if err = vc.Disconnect(); err != nil {
+		if err = vc.Disconnect(ctx); err != nil {
 			p.logger.Error("voice connection disconnect",
 				log.SlogError(err),
 			)
@@ -99,7 +102,7 @@ func (p Player) Play(s *discordgo.Session, m *discordgo.MessageCreate) error {
 		return fmt.Errorf("voice connection stop speaking: %w", err)
 	}
 
-	if err = vc.Disconnect(); err != nil {
+	if err = vc.Disconnect(ctx); err != nil {
 		return fmt.Errorf("voice connection disconnect: %w", err)
 	}
 
