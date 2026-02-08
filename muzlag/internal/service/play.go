@@ -73,25 +73,59 @@ func (s *Service) Play(p PlayParams) error {
 		return fmt.Errorf("player start: %w", err)
 	}
 
-	for p.GuildQueue.Ready && !p.GuildQueue.Skiped {
-		// read data from ffmpeg stdout
-		audiobuf := make([]int16, p.FrameSize*2)
+	var prebuf []int16
+	audiobufChan := make(chan []int16, p.FrameSize*2)
+	audiobufErrChan := make(chan error)
+	skipFirstFrame := true
 
-		err := binary.Read(pout, binary.LittleEndian, &audiobuf)
-		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-				return nil
+	go func() {
+		defer close(audiobufChan)
+		defer close(audiobufErrChan)
+
+		for {
+			if !p.GuildQueue.Ready || p.GuildQueue.Skiped {
+				break
 			}
 
-			s.logger.Error("binary read", log.SlogError(err))
+			// read data from ffmpeg stdout
+			audiobuf := make([]int16, p.FrameSize*2)
+			if err = binary.Read(pout, binary.LittleEndian, &audiobuf); err != nil {
+				audiobufErrChan <- err
+				return
+			}
+
+			audiobufChan <- audiobuf
+		}
+	}()
+
+	for buf := range audiobufChan {
+		if !p.GuildQueue.Ready || p.GuildQueue.Skiped {
+			break
+		}
+
+		if skipFirstFrame {
+			prebuf = <-audiobufChan
+			skipFirstFrame = false
+
+			continue
 		}
 
 		// Send received PCM to the sendPCM channel
 		select {
-		case p.Send <- audiobuf:
+		case p.Send <- prebuf:
 		case <-p.Done:
 			return nil
 		}
+
+		prebuf = buf
+	}
+
+	if err, closed := <-audiobufErrChan; !closed && err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return nil
+		}
+
+		s.logger.Error("binary read", log.SlogError(err))
 	}
 
 	return nil
